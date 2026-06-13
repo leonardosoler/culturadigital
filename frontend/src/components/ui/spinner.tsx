@@ -1,0 +1,15 @@
+import { Loader2 } from "lucide-react"
+import { cn } from "../../lib/utils"
+
+export function Spinner({ className }: { className?: string }) {
+  return <Loader2 className={cn("h-5 w-5 animate-spin text-indigo-600", className)} />
+}
+
+export function SpinnerOverlay({ texto = "Carregando..." }: { texto?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 py-12 text-sm text-slate-500">
+      <Spinner className="h-6 w-6" />
+      {texto}
+    </div>
+  )
+}

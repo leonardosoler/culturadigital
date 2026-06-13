@@ -1,0 +1,24 @@
+# Ambiente
+.env
+
+# Python
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/.venv/
+backend/staticfiles/
+backend/media/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Claude Code
+.claude/
+
+# Docker
+**/*.log

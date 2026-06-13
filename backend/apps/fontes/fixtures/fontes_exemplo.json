@@ -1,0 +1,30 @@
+[
+  {
+    "model": "fontes.fonte",
+    "pk": 1,
+    "fields": {
+      "nome": "Mapa Cultural do Ceará",
+      "tipo": "mapas_cultural",
+      "url_base": "https://mapacultural.secult.ce.gov.br",
+      "config": {"limite": 30},
+      "ativo": true,
+      "ultima_execucao": null,
+      "ultimo_resultado": "",
+      "criada_em": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "fontes.fonte",
+    "pk": 2,
+    "fields": {
+      "nome": "Mapas Culturais (Sistema Nacional)",
+      "tipo": "mapas_cultural",
+      "url_base": "https://mapa.cultura.gov.br",
+      "config": {"limite": 30},
+      "ativo": true,
+      "ultima_execucao": null,
+      "ultimo_resultado": "",
+      "criada_em": "2026-01-01T00:00:00Z"
+    }
+  }
+]
