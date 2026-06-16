@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Plus, Trash2, X } from "lucide-react"
 import { isAxiosError } from "axios"
 import { api } from "../lib/api"
-import type { Grupo, Membership, Organizacao, Papel } from "../types"
+import type { CategoriaEdital, Grupo, Membership, Organizacao, Papel } from "../types"
+import { CATEGORIAS_EDITAL } from "../types"
 import { ESTADOS_BRASIL } from "../lib/estados"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "../components/ui/card"
 import { Input } from "../components/ui/input"
@@ -20,6 +21,7 @@ function GruposSection({ membros }: { membros: Membership[] }) {
   const [novaDescricao, setNovaDescricao] = useState("")
   const [novosEstados, setNovosEstados] = useState<string[]>([])
   const [novasAreas, setNovasAreas] = useState<string[]>([])
+  const [novasCategorias, setNovasCategorias] = useState<CategoriaEdital[]>([])
   const [areaInput, setAreaInput] = useState("")
   const [erroGrupo, setErroGrupo] = useState<string | null>(null)
 
@@ -33,7 +35,7 @@ function GruposSection({ membros }: { membros: Membership[] }) {
 
   const criarGrupo = useMutation({
     mutationFn: async () => {
-      await api.post("/auth/grupos/", { nome: novoNome, descricao: novaDescricao, estados: novosEstados, areas_culturais: novasAreas })
+      await api.post("/auth/grupos/", { nome: novoNome, descricao: novaDescricao, estados: novosEstados, areas_culturais: novasAreas, categorias: novasCategorias })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["grupos"] })
@@ -41,6 +43,7 @@ function GruposSection({ membros }: { membros: Membership[] }) {
       setNovaDescricao("")
       setNovosEstados([])
       setNovasAreas([])
+      setNovasCategorias([])
       setAreaInput("")
       setErroGrupo(null)
     },
@@ -68,6 +71,10 @@ function GruposSection({ membros }: { membros: Membership[] }) {
 
   function toggleEstado(sigla: string) {
     setNovosEstados((prev) => prev.includes(sigla) ? prev.filter((e) => e !== sigla) : [...prev, sigla])
+  }
+
+  function toggleCategoria(cat: CategoriaEdital) {
+    setNovasCategorias((prev) => prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat])
   }
 
   function adicionarArea() {
@@ -113,6 +120,15 @@ function GruposSection({ membros }: { membros: Membership[] }) {
                       <span key={a} className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">{a}</span>
                     ))
                   : <span className="text-slate-400">Todas as áreas</span>}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {grupo.categorias.length > 0
+                  ? grupo.categorias.map((c) => (
+                      <span key={c} className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        {CATEGORIAS_EDITAL[c] ?? c}
+                      </span>
+                    ))
+                  : <span className="text-slate-400">Todas as categorias</span>}
               </div>
               <div className="flex flex-col gap-1.5">
                 <p className="font-medium text-slate-700">Membros ({grupo.total_membros})</p>
@@ -202,6 +218,26 @@ function GruposSection({ membros }: { membros: Membership[] }) {
                   className="flex-1"
                 />
                 <Button type="button" variant="outline" size="sm" onClick={adicionarArea}>Adicionar</Button>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>Categorias de interesse <span className="text-slate-400 font-normal">(vazio = todas)</span></Label>
+              <div className="flex flex-wrap gap-1.5">
+                {(Object.entries(CATEGORIAS_EDITAL) as [CategoriaEdital, string][]).map(([valor, label]) => (
+                  <button
+                    key={valor}
+                    type="button"
+                    onClick={() => toggleCategoria(valor)}
+                    className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
+                      novasCategorias.includes(valor)
+                        ? "border-amber-500 bg-amber-500 text-white"
+                        : "border-slate-200 text-slate-600 hover:border-amber-300"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
 
