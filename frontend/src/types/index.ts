@@ -23,6 +23,43 @@ export interface Membership {
   criado_em: string
 }
 
+export type CategoriaEdital =
+  | "cultural"
+  | "licitacao"
+  | "bolsa"
+  | "concurso_publico"
+  | "chamada_pesquisa"
+  | "outros"
+
+export const CATEGORIAS_EDITAL: Record<CategoriaEdital, string> = {
+  cultural: "Cultural",
+  licitacao: "Licitação",
+  bolsa: "Bolsa / Financiamento",
+  concurso_publico: "Concurso Público",
+  chamada_pesquisa: "Chamada de Pesquisa",
+  outros: "Outros",
+}
+
+export type TipoLogEvento =
+  | "scraping_ok"
+  | "scraping_erro"
+  | "ia_processado"
+  | "ia_erro"
+  | "edital_criado"
+  | "prazo_ignorado"
+  | "acompanhamento_criado"
+
+export interface LogEvento {
+  id: number
+  tipo: TipoLogEvento
+  mensagem: string
+  detalhes: Record<string, unknown>
+  edital: number | null
+  edital_titulo: string | null
+  organizacao: number | null
+  criado_em: string
+}
+
 export type TipoFonte = "mapas_cultural" | "manual" | "outro"
 
 export interface Fonte {
@@ -65,6 +102,7 @@ export interface RequisitosIA {
 export interface Edital {
   id: number
   titulo: string
+  categoria: CategoriaEdital
   fonte: number | null
   fonte_nome: string | null
   url_origem: string
@@ -76,6 +114,7 @@ export interface Edital {
   valor_minimo: string | null
   valor_maximo: string | null
   status_processamento_ia: StatusProcessamentoIA
+  score_relevancia: number | null
   criado_em: string
 }
 
@@ -88,6 +127,19 @@ export interface EditalDetalhe extends Edital {
   requisitos_ia: RequisitosIA
   erro_processamento: string
   atualizado_em: string
+}
+
+export interface Grupo {
+  id: number
+  nome: string
+  descricao: string
+  estados: string[]
+  areas_culturais: string[]
+  categorias: CategoriaEdital[]
+  ativo: boolean
+  membros: Usuario[]
+  total_membros: number
+  criado_em: string
 }
 
 export type StatusAcompanhamento =
@@ -170,18 +222,6 @@ export interface DocumentoGerado {
   conteudo: string
   versao: number
   gerado_em: string
-}
-
-export interface Grupo {
-  id: number
-  nome: string
-  descricao: string
-  estados: string[]
-  areas_culturais: string[]
-  ativo: boolean
-  membros: Usuario[]
-  total_membros: number
-  criado_em: string
 }
 
 export interface PaginatedResponse<T> {

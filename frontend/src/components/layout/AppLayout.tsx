@@ -1,13 +1,17 @@
 import { NavLink, Outlet } from "react-router-dom"
-import { ClipboardList, FilePlus2, LayoutGrid, LogOut, Radio, Settings } from "lucide-react"
+import { ActivitySquare, CalendarClock, ClipboardList, FilePlus2, FolderOpen, Home, LayoutGrid, LogOut, Radio, Settings } from "lucide-react"
 import { useAuth } from "../../lib/auth"
 import { cn } from "../../lib/utils"
 
 const NAV_ITEMS = [
-  { to: "/", label: "Catálogo de editais", icon: LayoutGrid, end: true },
+  { to: "/", label: "Início", icon: Home, end: true },
+  { to: "/catalogo", label: "Catálogo de editais", icon: LayoutGrid, end: false },
   { to: "/meus-editais", label: "Meus editais", icon: ClipboardList, end: false },
+  { to: "/prazos", label: "Agenda de prazos", icon: CalendarClock, end: false },
   { to: "/fontes", label: "Fontes", icon: Radio, end: false },
   { to: "/cadastro-manual", label: "Cadastro manual", icon: FilePlus2, end: false },
+  { to: "/documentos", label: "Documentos", icon: FolderOpen, end: false },
+  { to: "/logs", label: "Logs do sistema", icon: ActivitySquare, end: false },
   { to: "/configuracoes", label: "Configurações", icon: Settings, end: false },
 ]
 

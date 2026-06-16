@@ -32,10 +32,18 @@ def buscar_editais_fonte(fonte_id: int) -> str:
         itens = scraper.buscar(fonte)
     except Exception as exc:  # noqa: BLE001 - registramos qualquer erro de scraping
         logger.exception("Erro ao buscar editais da fonte %s (%s)", fonte.nome, fonte.id)
+        from apps.editais.models import LogEvento
+        LogEvento.objects.create(
+            tipo=LogEvento.Tipo.SCRAPING_ERRO,
+            mensagem=f'Erro no scraping de "{fonte.nome}": {exc}',
+            detalhes={"fonte_id": fonte.id},
+        )
         fonte.ultima_execucao = timezone.now()
         fonte.ultimo_resultado = f"Erro: {exc}"
         fonte.save(update_fields=["ultima_execucao", "ultimo_resultado"])
         return fonte.ultimo_resultado
+
+    from apps.editais.models import LogEvento
 
     criados = 0
     atualizados = 0
@@ -48,8 +56,13 @@ def buscar_editais_fonte(fonte_id: int) -> str:
             prazo = item.get("prazo_inscricao")
             if prazo and prazo < date.today():
                 ignorados += 1
+                LogEvento.objects.create(
+                    tipo=LogEvento.Tipo.PRAZO_IGNORADO,
+                    mensagem=f'Edital "{(item.get("titulo") or "")[:80]}" ignorado: prazo {prazo} ja vencido.',
+                    detalhes={"fonte": fonte.nome, "identificador": identificador},
+                )
                 continue
-            _, created = Edital.objects.update_or_create(
+            edital, created = Edital.objects.update_or_create(
                 fonte=fonte,
                 identificador_externo=identificador,
                 defaults={
@@ -65,13 +78,26 @@ def buscar_editais_fonte(fonte_id: int) -> str:
             )
             if created:
                 criados += 1
+                LogEvento.objects.create(
+                    tipo=LogEvento.Tipo.EDITAL_CRIADO,
+                    mensagem=f'Novo edital: "{edital.titulo[:80]}".',
+                    edital=edital,
+                    detalhes={"fonte": fonte.nome},
+                )
             else:
                 atualizados += 1
 
+    resultado = f"{criados} edital(is) novo(s), {atualizados} atualizado(s), {ignorados} ignorado(s) por prazo vencido."
     fonte.ultima_execucao = timezone.now()
-    fonte.ultimo_resultado = f"{criados} edital(is) novo(s), {atualizados} atualizado(s), {ignorados} ignorado(s) por prazo vencido."
+    fonte.ultimo_resultado = resultado
     fonte.save(update_fields=["ultima_execucao", "ultimo_resultado"])
-    return fonte.ultimo_resultado
+
+    LogEvento.objects.create(
+        tipo=LogEvento.Tipo.SCRAPING_OK,
+        mensagem=f'Scraping de "{fonte.nome}" concluido: {resultado}',
+        detalhes={"fonte_id": fonte.id, "criados": criados, "atualizados": atualizados, "ignorados": ignorados},
+    )
+    return resultado
 
 
 @shared_task

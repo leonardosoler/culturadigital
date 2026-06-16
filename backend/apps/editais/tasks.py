@@ -86,16 +86,33 @@ def processar_edital_ia(edital_id: int) -> str:
             if prazo:
                 edital.prazo_inscricao = prazo
 
+        categoria_ia = str(resultado.get("categoria") or "").strip().lower()
+        if categoria_ia in Edital.Categoria.values:
+            edital.categoria = categoria_ia
+
         valores = resultado.get("valores") or {}
         edital.valor_minimo = _to_decimal(valores.get("valor_minimo"))
         edital.valor_maximo = _to_decimal(valores.get("valor_maximo"))
 
         edital.status_processamento_ia = Edital.StatusProcessamento.PROCESSADO
         edital.save()
+
+        from .models import LogEvento
+        LogEvento.objects.create(
+            tipo=LogEvento.Tipo.IA_PROCESSADO,
+            mensagem=f'IA processou "{edital.titulo[:80]}".',
+            edital=edital,
+        )
         return "Edital processado com sucesso."
     except Exception as exc:  # noqa: BLE001
         logger.exception("Erro ao processar edital %s com IA", edital_id)
         edital.status_processamento_ia = Edital.StatusProcessamento.ERRO
         edital.erro_processamento = str(exc)
         edital.save(update_fields=["status_processamento_ia", "erro_processamento"])
+        from .models import LogEvento
+        LogEvento.objects.create(
+            tipo=LogEvento.Tipo.IA_ERRO,
+            mensagem=f'Erro ao processar IA para "{edital.titulo[:80]}": {exc}',
+            edital=edital,
+        )
         raise

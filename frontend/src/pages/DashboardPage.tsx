@@ -6,6 +6,7 @@ import { api } from "../lib/api"
 import { formatarData, formatarMoeda } from "../lib/utils"
 import { ESTADOS_BRASIL, ESTADO_PADRAO } from "../lib/estados"
 import type { Edital, Grupo, PaginatedResponse, StatusProcessamentoIA } from "../types"
+import { CATEGORIAS_EDITAL } from "../types"
 import { Card, CardContent } from "../components/ui/card"
 import { Input } from "../components/ui/input"
 import { Badge } from "../components/ui/badge"
@@ -188,10 +189,18 @@ export function DashboardPage() {
               <CardContent className="flex h-full flex-col gap-2">
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="line-clamp-2 font-semibold text-slate-900">{edital.titulo}</h3>
-                  <Badge status={edital.status_processamento_ia}>{STATUS_LABELS[edital.status_processamento_ia]}</Badge>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <Badge status={edital.status_processamento_ia}>{STATUS_LABELS[edital.status_processamento_ia]}</Badge>
+                    {edital.score_relevancia != null && (
+                      <span className="text-xs font-semibold text-indigo-600">{edital.score_relevancia}% relevante</span>
+                    )}
+                  </div>
                 </div>
                 {edital.orgao_responsavel && <p className="text-sm text-slate-600">{edital.orgao_responsavel}</p>}
                 <div className="flex flex-wrap gap-1.5">
+                  <span className="inline-flex w-fit rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
+                    {CATEGORIAS_EDITAL[edital.categoria] ?? edital.categoria}
+                  </span>
                   {edital.area_cultural && (
                     <span className="inline-flex w-fit rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
                       {edital.area_cultural}

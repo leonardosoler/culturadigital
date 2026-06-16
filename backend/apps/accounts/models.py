@@ -45,6 +45,7 @@ class Grupo(models.Model):
     membros = models.ManyToManyField("Usuario", related_name="grupos", blank=True)
     estados = models.JSONField(default=list, blank=True, help_text="UFs de interesse (lista vazia = todos os estados)")
     areas_culturais = models.JSONField(default=list, blank=True, help_text="Áreas culturais de interesse (lista vazia = todas)")
+    categorias = models.JSONField(default=list, blank=True, help_text="Categorias de edital de interesse (lista vazia = todas)")
     ativo = models.BooleanField(default=True)
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
