@@ -13,6 +13,7 @@ import { ConfiguracoesPage } from "./pages/ConfiguracoesPage"
 import { DocumentosPage } from "./pages/DocumentosPage"
 import { PrazosPage } from "./pages/PrazosPage"
 import { LogsPage } from "./pages/LogsPage"
+import { SaudePage } from "./pages/SaudePage"
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
           <Route path="/documentos" element={<DocumentosPage />} />
           <Route path="/configuracoes" element={<ConfiguracoesPage />} />
           <Route path="/logs" element={<LogsPage />} />
+          <Route path="/saude" element={<SaudePage />} />
         </Route>
       </Route>
 

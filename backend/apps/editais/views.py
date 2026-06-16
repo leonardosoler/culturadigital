@@ -1,12 +1,14 @@
 from datetime import date
 
-from django.db.models import Case, IntegerField, Q, Value, When
+from django.db.models import Case, Count, IntegerField, Q, Value, When
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend, FilterSet, DateFilter
 from rest_framework import filters as drf_filters
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .models import Edital, LogEvento
 from .serializers import EditalDetailSerializer, EditalListSerializer, EditalManualSerializer, LogEventoSerializer
@@ -115,6 +117,54 @@ class EditalManualCreateView(generics.CreateAPIView):
         processar_edital_ia.delay(edital.id)
         output = EditalDetailSerializer(edital, context=self.get_serializer_context())
         return Response(output.data, status=status.HTTP_201_CREATED)
+
+
+class SaudeView(APIView):
+    """Estatísticas de saúde do sistema para o dashboard operacional."""
+
+    def get(self, request):
+        from apps.acompanhamento.models import AcompanhamentoEdital, NotificacaoPrazoEnviada
+        from apps.fontes.models import Fonte
+
+        editais_qs = Edital.objects.all()
+        fontes_qs = Fonte.objects.all()
+
+        trinta_dias_atras = timezone.now() - timezone.timedelta(days=30)
+
+        dados = {
+            "editais": {
+                "total": editais_qs.count(),
+                "sem_prazo": editais_qs.filter(prazo_inscricao__isnull=True).count(),
+                "sem_categoria": editais_qs.filter(categoria=Edital.Categoria.CULTURAL).count(),
+                "com_erro_ia": editais_qs.filter(status_processamento_ia=Edital.StatusProcessamento.ERRO).count(),
+                "pendentes_ia": editais_qs.filter(
+                    status_processamento_ia__in=[Edital.StatusProcessamento.PENDENTE, Edital.StatusProcessamento.PROCESSANDO]
+                ).count(),
+            },
+            "fontes": {
+                "total": fontes_qs.count(),
+                "ativas": fontes_qs.filter(ativo=True).count(),
+                "com_erro": fontes_qs.filter(ultimo_resultado__startswith="Erro").count(),
+                "sem_execucao": fontes_qs.filter(ultima_execucao__isnull=True).count(),
+            },
+            "acompanhamentos": {
+                "total": AcompanhamentoEdital.objects.count(),
+                "aprovados": AcompanhamentoEdital.objects.filter(aprovado=True).count(),
+                "notificacoes_30d": NotificacaoPrazoEnviada.objects.filter(enviado_em__gte=trinta_dias_atras).count(),
+            },
+            "logs": {
+                "scraping_erros_30d": LogEvento.objects.filter(
+                    tipo=LogEvento.Tipo.SCRAPING_ERRO, criado_em__gte=trinta_dias_atras
+                ).count(),
+                "ia_erros_30d": LogEvento.objects.filter(
+                    tipo=LogEvento.Tipo.IA_ERRO, criado_em__gte=trinta_dias_atras
+                ).count(),
+                "editais_criados_30d": LogEvento.objects.filter(
+                    tipo=LogEvento.Tipo.EDITAL_CRIADO, criado_em__gte=trinta_dias_atras
+                ).count(),
+            },
+        }
+        return Response(dados)
 
 
 class LogEventoListView(generics.ListAPIView):

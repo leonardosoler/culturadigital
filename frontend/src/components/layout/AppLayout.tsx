@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom"
-import { ActivitySquare, CalendarClock, ClipboardList, FilePlus2, FolderOpen, Home, LayoutGrid, LogOut, Radio, Settings } from "lucide-react"
+import { ActivitySquare, CalendarClock, ClipboardList, FilePlus2, FolderOpen, HeartPulse, Home, LayoutGrid, LogOut, Radio, Settings } from "lucide-react"
 import { useAuth } from "../../lib/auth"
 import { cn } from "../../lib/utils"
 
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { to: "/fontes", label: "Fontes", icon: Radio, end: false },
   { to: "/cadastro-manual", label: "Cadastro manual", icon: FilePlus2, end: false },
   { to: "/documentos", label: "Documentos", icon: FolderOpen, end: false },
+  { to: "/saude", label: "Saúde do sistema", icon: HeartPulse, end: false },
   { to: "/logs", label: "Logs do sistema", icon: ActivitySquare, end: false },
   { to: "/configuracoes", label: "Configurações", icon: Settings, end: false },
 ]
