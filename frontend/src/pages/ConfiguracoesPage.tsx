@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react"
 import type { FormEvent } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Plus, Trash2 } from "lucide-react"
+import { Plus, Trash2, X } from "lucide-react"
 import { isAxiosError } from "axios"
 import { api } from "../lib/api"
-import type { Membership, Organizacao, Papel } from "../types"
+import type { Grupo, Membership, Organizacao, Papel } from "../types"
+import { ESTADOS_BRASIL } from "../lib/estados"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "../components/ui/card"
 import { Input } from "../components/ui/input"
 import { Label } from "../components/ui/label"
@@ -12,6 +13,210 @@ import { Button } from "../components/ui/button"
 import { Badge } from "../components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select"
 import { SpinnerOverlay } from "../components/ui/spinner"
+
+function GruposSection({ membros }: { membros: Membership[] }) {
+  const queryClient = useQueryClient()
+  const [novoNome, setNovoNome] = useState("")
+  const [novaDescricao, setNovaDescricao] = useState("")
+  const [novosEstados, setNovosEstados] = useState<string[]>([])
+  const [novasAreas, setNovasAreas] = useState<string[]>([])
+  const [areaInput, setAreaInput] = useState("")
+  const [erroGrupo, setErroGrupo] = useState<string | null>(null)
+
+  const { data: grupos, isLoading } = useQuery({
+    queryKey: ["grupos"],
+    queryFn: async () => {
+      const { data } = await api.get<Grupo[]>("/auth/grupos/")
+      return data
+    },
+  })
+
+  const criarGrupo = useMutation({
+    mutationFn: async () => {
+      await api.post("/auth/grupos/", { nome: novoNome, descricao: novaDescricao, estados: novosEstados, areas_culturais: novasAreas })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["grupos"] })
+      setNovoNome("")
+      setNovaDescricao("")
+      setNovosEstados([])
+      setNovasAreas([])
+      setAreaInput("")
+      setErroGrupo(null)
+    },
+    onError: () => setErroGrupo("Não foi possível criar o grupo."),
+  })
+
+  const excluirGrupo = useMutation({
+    mutationFn: async (id: number) => { await api.delete(`/auth/grupos/${id}/`) },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["grupos"] }),
+  })
+
+  const adicionarMembro = useMutation({
+    mutationFn: async ({ grupoId, usuarioId }: { grupoId: number; usuarioId: number }) => {
+      await api.post(`/auth/grupos/${grupoId}/membros/`, { usuario_id: usuarioId })
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["grupos"] }),
+  })
+
+  const removerMembro = useMutation({
+    mutationFn: async ({ grupoId, usuarioId }: { grupoId: number; usuarioId: number }) => {
+      await api.delete(`/auth/grupos/${grupoId}/membros/${usuarioId}/`)
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["grupos"] }),
+  })
+
+  function toggleEstado(sigla: string) {
+    setNovosEstados((prev) => prev.includes(sigla) ? prev.filter((e) => e !== sigla) : [...prev, sigla])
+  }
+
+  function adicionarArea() {
+    const area = areaInput.trim()
+    if (area && !novasAreas.includes(area)) {
+      setNovasAreas((prev) => [...prev, area])
+    }
+    setAreaInput("")
+  }
+
+  return (
+    <div className="flex max-w-2xl flex-col gap-4">
+      <div>
+        <h2 className="text-lg font-semibold text-slate-900">Grupos de interesse</h2>
+        <p className="text-sm text-slate-500">Crie grupos com filtros de estado e área para segmentar o catálogo por perfil de interesse.</p>
+      </div>
+
+      {isLoading && <SpinnerOverlay />}
+
+      {grupos?.map((grupo) => {
+        const membroIds = new Set(grupo.membros.map((m) => m.id))
+        const membrosFora = membros.filter((m) => !membroIds.has(m.usuario.id))
+        return (
+          <Card key={grupo.id}>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-base">{grupo.nome}</CardTitle>
+                <Button variant="ghost" size="icon" onClick={() => excluirGrupo.mutate(grupo.id)}>
+                  <Trash2 className="h-4 w-4 text-slate-400" />
+                </Button>
+              </div>
+              {grupo.descricao && <CardDescription>{grupo.descricao}</CardDescription>}
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 text-sm">
+              <div className="flex flex-wrap gap-1.5">
+                {grupo.estados.length > 0
+                  ? grupo.estados.map((uf) => <Badge key={uf} variant="outline">{uf}</Badge>)
+                  : <span className="text-slate-400">Todos os estados</span>}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {grupo.areas_culturais.length > 0
+                  ? grupo.areas_culturais.map((a) => (
+                      <span key={a} className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">{a}</span>
+                    ))
+                  : <span className="text-slate-400">Todas as áreas</span>}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <p className="font-medium text-slate-700">Membros ({grupo.total_membros})</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {grupo.membros.map((u) => (
+                    <span key={u.id} className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+                      {u.username}
+                      <button onClick={() => removerMembro.mutate({ grupoId: grupo.id, usuarioId: u.id })}>
+                        <X className="h-3 w-3 text-slate-400 hover:text-red-500" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                {membrosFora.length > 0 && (
+                  <Select onValueChange={(v) => adicionarMembro.mutate({ grupoId: grupo.id, usuarioId: Number(v) })}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Adicionar membro..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {membrosFora.map((m) => (
+                        <SelectItem key={m.usuario.id} value={String(m.usuario.id)}>{m.usuario.username}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Novo grupo</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={(e) => { e.preventDefault(); criarGrupo.mutate() }} className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label>Nome</Label>
+                <Input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} required placeholder="Ex: Equipe Música SP" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>Descrição</Label>
+                <Input value={novaDescricao} onChange={(e) => setNovaDescricao(e.target.value)} placeholder="Opcional" />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>Estados de interesse <span className="text-slate-400 font-normal">(vazio = todos)</span></Label>
+              <div className="flex flex-wrap gap-1.5">
+                {ESTADOS_BRASIL.map((uf) => (
+                  <button
+                    key={uf.sigla}
+                    type="button"
+                    onClick={() => toggleEstado(uf.sigla)}
+                    className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
+                      novosEstados.includes(uf.sigla)
+                        ? "border-indigo-500 bg-indigo-500 text-white"
+                        : "border-slate-200 text-slate-600 hover:border-indigo-300"
+                    }`}
+                  >
+                    {uf.sigla}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>Áreas culturais <span className="text-slate-400 font-normal">(vazio = todas)</span></Label>
+              <div className="flex flex-wrap gap-1.5">
+                {novasAreas.map((area) => (
+                  <span key={area} className="flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700">
+                    {area}
+                    <button type="button" onClick={() => setNovasAreas((a) => a.filter((x) => x !== area))}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={areaInput}
+                  onChange={(e) => setAreaInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); adicionarArea() } }}
+                  placeholder="Ex: Música, Teatro, Dança..."
+                  className="flex-1"
+                />
+                <Button type="button" variant="outline" size="sm" onClick={adicionarArea}>Adicionar</Button>
+              </div>
+            </div>
+
+            {erroGrupo && <p className="text-sm text-red-600">{erroGrupo}</p>}
+            <div>
+              <Button type="submit" disabled={criarGrupo.isPending || !novoNome.trim()}>
+                {criarGrupo.isPending ? "Criando..." : "Criar grupo"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
 
 interface CampoCadastral {
   chave: string
@@ -198,6 +403,8 @@ export function ConfiguracoesPage() {
           </CardContent>
         </Card>
       )}
+
+      <GruposSection membros={membros ?? []} />
 
       <Card className="max-w-2xl">
         <CardHeader>

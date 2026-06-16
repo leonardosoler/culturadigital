@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from .models import Membership, Organizacao
+from .models import Grupo, Membership, Organizacao
 
 Usuario = get_user_model()
 
@@ -25,6 +25,16 @@ class MembershipSerializer(serializers.ModelSerializer):
     class Meta:
         model = Membership
         fields = ["id", "usuario", "papel", "criado_em"]
+
+
+class GrupoSerializer(serializers.ModelSerializer):
+    membros = UsuarioSerializer(many=True, read_only=True)
+    total_membros = serializers.IntegerField(source="membros.count", read_only=True)
+
+    class Meta:
+        model = Grupo
+        fields = ["id", "nome", "descricao", "estados", "areas_culturais", "ativo", "membros", "total_membros", "criado_em"]
+        read_only_fields = ["id", "criado_em", "membros", "total_membros"]
 
 
 class RegistroSerializer(serializers.Serializer):

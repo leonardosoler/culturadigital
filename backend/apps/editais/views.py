@@ -1,3 +1,6 @@
+from datetime import date
+
+from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend, FilterSet, DateFilter
 from rest_framework import filters as drf_filters
 from rest_framework import generics, status, viewsets
@@ -16,18 +19,39 @@ class EditalFilter(FilterSet):
 
     class Meta:
         model = Edital
-        fields = ["fonte", "area_cultural", "status_processamento_ia", "orgao_responsavel"]
+        fields = ["fonte", "area_cultural", "estado", "status_processamento_ia", "orgao_responsavel"]
 
 
 class EditalViewSet(viewsets.ReadOnlyModelViewSet):
     """Catálogo global de editais encontrados (somente leitura + ações de processamento)."""
 
-    queryset = Edital.objects.select_related("fonte").all()
     filterset_class = EditalFilter
     filter_backends = [DjangoFilterBackend, drf_filters.SearchFilter, drf_filters.OrderingFilter]
     search_fields = ["titulo", "descricao", "orgao_responsavel", "area_cultural"]
     ordering_fields = ["criado_em", "prazo_inscricao", "data_publicacao", "titulo"]
     ordering = ["-criado_em"]
+
+    def get_queryset(self):
+        qs = (
+            Edital.objects.select_related("fonte")
+            .filter(Q(fonte__isnull=True) | Q(fonte__ativo=True))
+            .filter(Q(prazo_inscricao__isnull=True) | Q(prazo_inscricao__gte=date.today()))
+        )
+        grupo_id = self.request.query_params.get("grupo")
+        if grupo_id:
+            try:
+                from apps.accounts.models import Grupo
+                grupo = Grupo.objects.get(pk=grupo_id, organizacao=self.request.user.organizacao, ativo=True)
+                if grupo.estados:
+                    qs = qs.filter(estado__in=grupo.estados)
+                if grupo.areas_culturais:
+                    area_q = Q()
+                    for area in grupo.areas_culturais:
+                        area_q |= Q(area_cultural__icontains=area)
+                    qs = qs.filter(area_q)
+            except (Grupo.DoesNotExist, Exception):
+                pass
+        return qs
 
     def get_serializer_class(self):
         if self.action == "retrieve":

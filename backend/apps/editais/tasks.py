@@ -1,4 +1,5 @@
 import logging
+from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from celery import shared_task
@@ -6,6 +7,7 @@ from celery import shared_task
 from apps.ai_services import services as ai_services
 from apps.ai_services.pdf_utils import extrair_texto_pdf
 from apps.ai_services.web_utils import extrair_texto_url
+from apps.fontes.constants import UFS_VALIDAS
 
 from .models import Edital
 
@@ -19,6 +21,31 @@ def _to_decimal(valor):
         return Decimal(str(valor))
     except (InvalidOperation, ValueError, TypeError):
         return None
+
+
+def _extrair_prazo_inscricao(prazos: list) -> date | None:
+    """Escolhe a data de inscrição da lista de prazos retornada pela IA.
+
+    Prefere entradas cuja descrição contenha 'inscri'; caso contrário usa a
+    data mais próxima (menor), que tende a ser o prazo de inscrição.
+    """
+    candidatos = []
+    for item in prazos or []:
+        data_str = (item.get("data") or "")[:10]
+        try:
+            d = date.fromisoformat(data_str)
+        except (ValueError, TypeError):
+            continue
+        candidatos.append((item.get("descricao", "").lower(), d))
+
+    if not candidatos:
+        return None
+
+    for descricao, d in candidatos:
+        if "inscri" in descricao:
+            return d
+
+    return min(d for _, d in candidatos)
 
 
 @shared_task
@@ -49,6 +76,15 @@ def processar_edital_ia(edital_id: int) -> str:
             edital.orgao_responsavel = str(resultado["orgao_responsavel"])[:255]
         if resultado.get("area_cultural") and not edital.area_cultural:
             edital.area_cultural = str(resultado["area_cultural"])[:255]
+        if resultado.get("estado") and not edital.estado:
+            estado_ia = str(resultado["estado"]).strip().upper()
+            if estado_ia in UFS_VALIDAS:
+                edital.estado = estado_ia
+
+        if not edital.prazo_inscricao:
+            prazo = _extrair_prazo_inscricao(resultado.get("prazos") or [])
+            if prazo:
+                edital.prazo_inscricao = prazo
 
         valores = resultado.get("valores") or {}
         edital.valor_minimo = _to_decimal(valores.get("valor_minimo"))

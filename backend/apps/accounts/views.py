@@ -1,13 +1,15 @@
 from django.contrib.auth import get_user_model
-from rest_framework import generics, permissions, status
-from rest_framework.exceptions import NotFound
+from rest_framework import generics, permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Membership
+from .models import Grupo, Membership
 from .serializers import (
     ConvidarMembroSerializer,
+    GrupoSerializer,
     MembershipSerializer,
     OrganizacaoSerializer,
     RegistroSerializer,
@@ -64,6 +66,54 @@ class OrganizacaoView(generics.RetrieveUpdateAPIView):
         if organizacao is None:
             raise NotFound("Usuário não pertence a nenhuma organização.")
         return organizacao
+
+
+class GrupoViewSet(viewsets.ModelViewSet):
+    """CRUD de grupos de interesse da organização + gerenciamento de membros."""
+
+    serializer_class = GrupoSerializer
+
+    def _exigir_admin(self):
+        if self.request.user.papel != Membership.Papel.ADMIN:
+            raise PermissionDenied("Apenas administradores podem gerenciar grupos.")
+
+    def get_queryset(self):
+        org = self.request.user.organizacao
+        if not org:
+            return Grupo.objects.none()
+        return Grupo.objects.filter(organizacao=org).prefetch_related("membros")
+
+    def perform_create(self, serializer):
+        self._exigir_admin()
+        serializer.save(organizacao=self.request.user.organizacao)
+
+    def perform_update(self, serializer):
+        self._exigir_admin()
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._exigir_admin()
+        instance.delete()
+
+    @action(detail=True, methods=["post"], url_path="membros")
+    def adicionar_membro(self, request, pk=None):
+        grupo = self.get_object()
+        self._exigir_admin()
+        usuario_id = request.data.get("usuario_id")
+        if not usuario_id:
+            return Response({"detail": "usuario_id é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
+        org = request.user.organizacao
+        if not Membership.objects.filter(usuario_id=usuario_id, organizacao=org).exists():
+            return Response({"detail": "Usuário não pertence à organização."}, status=status.HTTP_400_BAD_REQUEST)
+        grupo.membros.add(usuario_id)
+        return Response(GrupoSerializer(grupo).data)
+
+    @action(detail=True, methods=["delete"], url_path=r"membros/(?P<usuario_id>[^/.]+)")
+    def remover_membro(self, request, pk=None, usuario_id=None):
+        grupo = self.get_object()
+        self._exigir_admin()
+        grupo.membros.remove(usuario_id)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class MembrosView(generics.ListCreateAPIView):

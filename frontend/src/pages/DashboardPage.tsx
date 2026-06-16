@@ -1,10 +1,11 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "react-router-dom"
-import { Search } from "lucide-react"
+import { Search, Users } from "lucide-react"
 import { api } from "../lib/api"
 import { formatarData, formatarMoeda } from "../lib/utils"
-import type { Edital, PaginatedResponse, StatusProcessamentoIA } from "../types"
+import { ESTADOS_BRASIL, ESTADO_PADRAO } from "../lib/estados"
+import type { Edital, Grupo, PaginatedResponse, StatusProcessamentoIA } from "../types"
 import { Card, CardContent } from "../components/ui/card"
 import { Input } from "../components/ui/input"
 import { Badge } from "../components/ui/badge"
@@ -23,15 +24,29 @@ export function DashboardPage() {
   const [search, setSearch] = useState("")
   const [areaCultural, setAreaCultural] = useState("")
   const [status, setStatus] = useState<string>("")
+  const [estado, setEstado] = useState<string>(ESTADO_PADRAO)
+  const [grupoId, setGrupoId] = useState<string>("")
   const [page, setPage] = useState(1)
 
+  const { data: grupos } = useQuery({
+    queryKey: ["grupos"],
+    queryFn: async () => {
+      const { data } = await api.get<Grupo[]>("/auth/grupos/")
+      return data
+    },
+  })
+
+  const grupoAtivo = grupos?.find((g) => String(g.id) === grupoId)
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["editais", { search, areaCultural, status, page }],
+    queryKey: ["editais", { search, areaCultural, status, estado, grupoId, page }],
     queryFn: async () => {
       const params: Record<string, string | number> = { page }
       if (search) params.search = search
       if (areaCultural) params.area_cultural = areaCultural
       if (status) params.status_processamento_ia = status
+      if (estado && !grupoId) params.estado = estado
+      if (grupoId) params.grupo = grupoId
       const { data } = await api.get<PaginatedResponse<Edital>>("/editais/", { params })
       return data
     },
@@ -39,10 +54,47 @@ export function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Catálogo de editais</h1>
-        <p className="text-sm text-slate-500">Editais culturais encontrados a partir das fontes cadastradas.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Catálogo de editais</h1>
+          <p className="text-sm text-slate-500">Editais encontrados a partir das fontes cadastradas.</p>
+        </div>
+        {grupos && grupos.length > 0 && (
+          <div className="flex shrink-0 flex-col gap-1.5">
+            <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700">
+              <Users className="h-4 w-4" /> Grupo
+            </label>
+            <Select
+              value={grupoId || "todos"}
+              onValueChange={(v) => {
+                setPage(1)
+                setGrupoId(v === "todos" ? "" : v)
+              }}
+            >
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Todos os grupos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os grupos</SelectItem>
+                {grupos.map((g) => (
+                  <SelectItem key={g.id} value={String(g.id)}>
+                    {g.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
+
+      {grupoAtivo && (
+        <div className="flex flex-wrap gap-2 rounded-md border border-indigo-100 bg-indigo-50 px-4 py-2 text-sm text-indigo-800">
+          <span className="font-medium">{grupoAtivo.nome}:</span>
+          {grupoAtivo.estados.length > 0 && <span>Estados: {grupoAtivo.estados.join(", ")}</span>}
+          {grupoAtivo.areas_culturais.length > 0 && <span>Áreas: {grupoAtivo.areas_culturais.join(", ")}</span>}
+          {grupoAtivo.estados.length === 0 && grupoAtivo.areas_culturais.length === 0 && <span>Sem filtros definidos</span>}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex min-w-[240px] flex-1 flex-col gap-1.5">
@@ -60,6 +112,30 @@ export function DashboardPage() {
             />
           </div>
         </div>
+        {!grupoId && (
+          <div className="flex w-48 flex-col gap-1.5">
+            <label className="text-sm font-medium text-slate-700">Estado</label>
+            <Select
+              value={estado || "todos"}
+              onValueChange={(v) => {
+                setPage(1)
+                setEstado(v === "todos" ? "" : v)
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Todos os estados" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os estados</SelectItem>
+                {ESTADOS_BRASIL.map((uf) => (
+                  <SelectItem key={uf.sigla} value={uf.sigla}>
+                    {uf.sigla} — {uf.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <div className="flex w-48 flex-col gap-1.5">
           <label className="text-sm font-medium text-slate-700">Área cultural</label>
           <Input
@@ -99,7 +175,10 @@ export function DashboardPage() {
       {isError && <p className="text-sm text-red-600">Não foi possível carregar os editais.</p>}
 
       {data && data.results.length === 0 && (
-        <p className="text-sm text-slate-500">Nenhum edital encontrado com os filtros atuais.</p>
+        <p className="text-sm text-slate-500">
+          Nenhum edital encontrado com os filtros atuais.
+          {estado && " Cadastre fontes ou editais manuais com o estado selecionado, ou troque o filtro de estado para \"Todos os estados\"."}
+        </p>
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -112,11 +191,18 @@ export function DashboardPage() {
                   <Badge status={edital.status_processamento_ia}>{STATUS_LABELS[edital.status_processamento_ia]}</Badge>
                 </div>
                 {edital.orgao_responsavel && <p className="text-sm text-slate-600">{edital.orgao_responsavel}</p>}
-                {edital.area_cultural && (
-                  <span className="inline-flex w-fit rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
-                    {edital.area_cultural}
-                  </span>
-                )}
+                <div className="flex flex-wrap gap-1.5">
+                  {edital.area_cultural && (
+                    <span className="inline-flex w-fit rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                      {edital.area_cultural}
+                    </span>
+                  )}
+                  {edital.estado && (
+                    <span className="inline-flex w-fit rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                      {edital.estado}
+                    </span>
+                  )}
+                </div>
                 <div className="mt-auto flex flex-col gap-1 pt-2 text-xs text-slate-500">
                   {edital.prazo_inscricao && <span>Prazo: {formatarData(edital.prazo_inscricao)}</span>}
                   {(edital.valor_minimo || edital.valor_maximo) && (

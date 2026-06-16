@@ -31,6 +31,7 @@ export interface Fonte {
   tipo: TipoFonte
   url_base: string
   config: Record<string, unknown>
+  estado: string
   ativo: boolean
   ultima_execucao: string | null
   ultimo_resultado: string
@@ -69,6 +70,7 @@ export interface Edital {
   url_origem: string
   orgao_responsavel: string
   area_cultural: string
+  estado: string
   data_publicacao: string | null
   prazo_inscricao: string | null
   valor_minimo: string | null
@@ -109,16 +111,54 @@ export interface ChecklistItem {
   criado_em: string
 }
 
+export interface ItemOrcamento {
+  id: number
+  acompanhamento: number
+  categoria: string
+  descricao: string
+  quantidade: string
+  valor_unitario: string
+  valor_total: string
+  criado_em: string
+}
+
+export interface Despesa {
+  id: number
+  acompanhamento: number
+  categoria: string
+  descricao: string
+  valor: string
+  data: string | null
+  comprovante: string | null
+  criado_em: string
+}
+
 export interface Acompanhamento {
   id: number
   organizacao: number
   edital: number
   edital_detalhe: Edital
   status: StatusAcompanhamento
+  aprovado: boolean
   notas: string
   checklist: ChecklistItem[]
+  itens_orcamento: ItemOrcamento[]
+  despesas: Despesa[]
   criado_em: string
   atualizado_em: string
+}
+
+export type CategoriaDocumentoOrganizacao = "juridico" | "pessoal" | "portfolio" | "comprovante" | "outro"
+
+export interface DocumentoOrganizacao {
+  id: number
+  organizacao: number
+  nome: string
+  categoria: CategoriaDocumentoOrganizacao
+  arquivo: string
+  validade: string | null
+  observacoes: string
+  criado_em: string
 }
 
 export type TipoMinuta = "carta_apresentacao" | "projeto" | "orcamento"
@@ -130,6 +170,18 @@ export interface DocumentoGerado {
   conteudo: string
   versao: number
   gerado_em: string
+}
+
+export interface Grupo {
+  id: number
+  nome: string
+  descricao: string
+  estados: string[]
+  areas_culturais: string[]
+  ativo: boolean
+  membros: Usuario[]
+  total_membros: number
+  criado_em: string
 }
 
 export interface PaginatedResponse<T> {
